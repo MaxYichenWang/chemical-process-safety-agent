@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test-python:
+    name: Python ${{ matrix.python-version }} tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+            pyproject.toml
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+          sudo apt-get clean
+          sudo rm -rf /var/lib/apt/lists/*
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir -r requirements-test.txt
+
+      - name: Check the installed evaluation entry point
+        run: |
+          cps-eval --help
+          cps-eval generate --dataset tests/fixtures/sample_eval_dataset.json --dry-run
+
+      - name: Check code formatting and linting
+        run: |
+          ruff check src/
+
+      - name: Run Python tests with pytest and generate coverage
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          OPENAI_API_KEY: "sk-dummy-for-ci"
+          CHROMA_OPENAI_API_KEY: "sk-dummy-for-ci"
+        run: |
+          pytest tests/ -v --tb=short --cov=src --cov-report=xml --cov-report=html --cov-report=term
+
+  test-wheel:
+    name: Python ${{ matrix.python-version }} installed wheel
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+
+      - name: Build source and wheel distributions
+        run: |
+          python -m pip install build
+          python -m build
+          python - <<'PY'
+          import glob, tarfile, zipfile
+          with tarfile.open(glob.glob('dist/*.tar.gz')[0]) as source:
+              names = source.getnames()
+              for required in ['Makefile', '.env.example', 'CONTRIBUTING.md', 'EVALUATION.md', 'tests/fixtures/sample_eval_dataset.json', 'scripts/reusable/verify_installed_wheel.py']:
+                  assert any(name.endswith('/' + required) for name in names), required
+              assert not any('/RELEASE_' in name for name in names)
+          with zipfile.ZipFile(glob.glob('dist/*.whl')[0]) as wheel:
+              assert not any('RELEASE_' in name for name in wheel.namelist())
+          PY
+
+      - name: Install the wheel into a fresh environment and check outside checkout
+        env:
+          ANONYMIZED_TELEMETRY: "false"
+          DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
+          RAGAS_DO_NOT_TRACK: "true"
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-env"
+          "$RUNNER_TEMP/wheel-env/bin/python" -m pip install --upgrade pip
+          "$RUNNER_TEMP/wheel-env/bin/python" -m pip install dist/*.whl
+          "$RUNNER_TEMP/wheel-env/bin/python" -m pip check
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel-env/bin/python" "$GITHUB_WORKSPACE/scripts/reusable/verify_installed_wheel.py" \
+            --fixture "$GITHUB_WORKSPACE/tests/fixtures/sample_eval_dataset.json"

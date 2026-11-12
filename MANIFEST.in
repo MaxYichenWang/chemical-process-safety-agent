@@ -1,0 +1,8 @@
+include Makefile .env.example .tool-versions .gitignore
+include requirements-test.txt CITATION.cff CONTRIBUTING.md EVALUATION.md ARCHITECTURE.md
+include .github/workflows/ci.yml
+recursive-include configs *.example.yaml
+recursive-include tests *.py *.json
+recursive-include src *.md
+global-exclude *.py[cod]
+exclude RELEASE_INDEPENDENT_REVIEW.md RELEASE_PRUNING_REVIEW.md RELEASE_REVIEW.md

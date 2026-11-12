@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chemical Process Safety LLM — Agentic RAG</title>
+<link rel="stylesheet" href="/static/styles.css?v=phase6_4" />
+</head>
+<body>
+  <header id="app-header">
+    <div class="header-branding">
+      <h1>Chemical Process Safety LLM</h1>
+    </div>
+    <div class="header-actions">
+      <button id="export-session-btn" type="button" class="action-btn" hidden title="Download full multi-turn conversation as Markdown">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export session (.md)</span>
+      </button>
+    </div>
+  </header>
+
+  <div id="layout">
+    <aside id="sidebar">
+      <div class="sidebar-top">
+        <button id="new-query-btn" class="primary-btn new-query-btn">
+          <span class="btn-icon">+</span> New query
+        </button>
+      </div>
+      <div class="sidebar-header-row">
+        <h2>Sessions</h2>
+      </div>
+      <div id="history-list" class="history-list"></div>
+      <button id="load-more-btn" class="link-btn" hidden>Load more</button>
+    </aside>
+
+    <main id="main">
+      <div id="chat-scroll-area" class="chat-scroll-area">
+        <!-- Empty / Welcome state when starting a fresh session -->
+        <div id="welcome-view" class="welcome-view">
+          <div class="welcome-card">
+            <h2>Process Safety Intelligence</h2>
+            <p class="welcome-desc">
+              Ask complex questions about chemical process safety regulations (OSHA PSM 1910.119),
+              CSB investigation reports, safety recommendations, and statistical incident records.
+            </p>
+            <div id="examples" class="examples-grid">
+              <div class="examples-header">Suggested Inquiries</div>
+              <button class="example-btn" data-q="What are the OSHA regulations for process safety management?">
+                <span class="ex-content">
+                  <span class="ex-title">OSHA PSM Regulations</span>
+                  <span class="ex-subtitle">Key requirements under 29 CFR 1910.119</span>
+                </span>
+              </button>
+              <button class="example-btn" data-q="What were the root causes identified by the CSB investigation into the West Fertilizer explosion?">
+                <span class="ex-content">
+                  <span class="ex-title">West Fertilizer Explosion</span>
+                  <span class="ex-subtitle">Root causes from the CSB investigation report</span>
+                </span>
+              </button>
+              <button class="example-btn" data-q="What recommendations were made to prevent future incidents?">
+                <span class="ex-content">
+                  <span class="ex-title">Safety Recommendations</span>
+                  <span class="ex-subtitle">Formal CSB safety guidance to prevent recurrences</span>
+                </span>
+              </button>
+              <button class="example-btn" data-q="How many fatalities occurred in refinery incidents?">
+                <span class="ex-content">
+                  <span class="ex-title">Refinery Incident Data</span>
+                  <span class="ex-subtitle">Analytical SQL queries across incident records</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active session container holding all turns (multi-round conversation) -->
+        <div id="session-view" class="session-view" hidden>
+          <div id="turns-container" class="turns-container"></div>
+        </div>
+      </div>
+
+      <!-- ChatGPT-style Bottom Input Container -->
+      <footer id="query-section" class="query-section">
+        <div class="query-box-wrapper">
+          <textarea id="query-input" rows="1"
+            placeholder="Ask a question about process safety, OSHA regulations, or CSB incidents… (Enter to send, Shift+Enter for newline)"></textarea>
+          <button id="ask-btn" class="ask-btn" aria-label="Send query" title="Send query (Enter)">
+            <svg class="send-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="query-footer-hint">
+          Chemical Process Safety LLM is an AI research prototype. Verify critical details against primary CSB & OSHA documents.
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <dialog id="delete-session-dialog" closedby="any" aria-labelledby="delete-dialog-title">
+    <h2 id="delete-dialog-title">Delete session?</h2>
+    <p id="delete-dialog-desc" class="dialog-desc">This will permanently remove all turns in this session from the run history.</p>
+    <form method="dialog" class="dialog-actions">
+      <button value="cancel" class="action-btn" autofocus>Cancel</button>
+      <button value="delete" class="danger-btn">Delete session</button>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js?v=phase6_4"></script>
+</body>
+</html>

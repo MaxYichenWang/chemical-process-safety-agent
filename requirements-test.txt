@@ -1,0 +1,2 @@
+# Use the same package and development dependencies as contributor installs.
+-e .[dev]

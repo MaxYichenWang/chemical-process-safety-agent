@@ -1,0 +1,25 @@
+[
+  {
+    "query": "Which inspection step is recorded for the fictional Example Plant vessel?",
+    "expected_answer": "The fictional maintenance record specifies a visual inspection before restart.",
+    "ground_truth_chunks": ["synthetic_example_maintenance_001"],
+    "source": "synthetic",
+    "category": "synthetic_simple",
+    "expected_agents": ["csb_incident"],
+    "complexity": "simple",
+    "l1_applicable": true,
+    "metadata": {"synthetic_fixture": true}
+  },
+  {
+    "query": "How many fictional Example Plant inspections are in the supplied table?",
+    "expected_answer": "The supplied fictional table contains two inspections.",
+    "ground_truth_chunks": [],
+    "source": "auto_statistical",
+    "category": "statistical_factual",
+    "expected_agents": ["data_analyst"],
+    "expected_sql": "SELECT COUNT(*) AS count FROM example_inspections",
+    "ground_truth_result": {"columns": ["count"], "rows": [[2]]},
+    "l1_applicable": false,
+    "metadata": {"synthetic_fixture": true}
+  }
+]

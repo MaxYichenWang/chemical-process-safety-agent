@@ -1,0 +1,250 @@
+# =============================================================================
+# Model sweep configuration (template)
+# =============================================================================
+# Define provider credentials once, then a list of named "runs" that override the
+# model/provider PER ROLE. The sweep runner (src/evaluation/model_sweep.py) turns
+# each run into a set of environment variables consumed by the agentic RAG
+# pipeline via src/agentic_rag/llm_factory.py, executes an eval tier, and (optionally)
+# diffs the result against the baseline with improvement_analyzer.py.
+#
+# Roles: supervisor | worker | reasoning | critic | data_analyst
+# Providers: openai | openai_compatible | anthropic
+#
+# Copy this file to configs/model_sweep.yaml and edit. Never commit real API keys —
+# only reference the NAME of the env var that holds each key.
+# =============================================================================
+
+# How the eval is run for every sweep entry (the runner reads these).
+defaults:
+  tier: T1                 # T0 (smoke) | T1 (regression) | T2 (full)
+  sample_per_source: 3     # T1 default; T0=1, T2=full
+  include_adversarial: false  # Set true, or pass CLI --include-adversarial, to append the adversarial dataset
+  max_concurrent: 3
+  seed: 42
+  eval_llm_model: gpt-5.4-mini   # judge model — KEEP FIXED across runs for comparable scores
+  # eval_llm_provider: openai   # optional (default: openai). Set alongside
+  #   eval_llm_model to change the GLOBAL default judge's provider for every
+  #   run in this file. A run's own `judge:` entry (see e.g.
+  #   deepseek_full_selfjudge below) overrides this default for that run
+  #   only -- see EVALUATION.md for the cost/risk
+  #   analysis of varying the judge per provider (short version: it breaks
+  #   cross-run comparability and risks self-preference bias, but can be
+  #   cheaper for providers priced below the fixed judge).
+  # baseline_results: data/evaluation/runs/my_baseline/results.json
+
+# Provider connection details. api_key_env names the environment variable that
+# holds the key; base_url is required only for openai_compatible endpoints.
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+  anthropic:
+    api_key_env: ANTHROPIC_API_KEY
+  together:                # example OpenAI-compatible endpoint
+    provider: openai_compatible
+    api_key_env: TOGETHER_API_KEY
+    base_url: https://api.together.xyz/v1
+  groq:
+    provider: openai_compatible
+    api_key_env: GROQ_API_KEY
+    base_url: https://api.groq.com/openai/v1
+  deepseek:                # OpenAI-compatible; verify base_url/model id against
+    provider: openai_compatible   # https://api-docs.deepseek.com before use — this space moves fast
+    api_key_env: DEEPSEEK_API_KEY
+    base_url: https://api.deepseek.com/v1
+  moonshot:                # Kimi (Moonshot AI); verify against https://platform.kimi.ai/docs
+    provider: openai_compatible
+    api_key_env: MOONSHOT_API_KEY
+    base_url: https://api.moonshot.ai/v1
+  minimax:                 # verify against https://platform.minimax.io/docs
+    provider: openai_compatible
+    api_key_env: MINIMAX_API_KEY
+    base_url: https://api.minimax.io/v1
+  gemini:                  # Google Gemini via its OpenAI-compatible endpoint
+    provider: openai_compatible   # https://ai.google.dev/gemini-api/docs/openai (confirmed 2026-07-27)
+    api_key_env: GEMINI_API_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+  qwen:                    # Alibaba Cloud Qwen via Model Studio OpenAI-compatible mode;
+    provider: openai_compatible
+    api_key_env: ALICLOUD_API_KEY   # or DASHSCOPE_API_KEY
+    base_url: https://ws-48q2hywrewc4xw5p.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+  glm:                     # Zhipu AI / z.ai GLM models. base_url confirmed
+    provider: openai_compatible   # directly against https://docs.z.ai/api-reference/introduction
+    api_key_env: ZAI_API_KEY      # (2026-07-27) -- HIGH confidence.
+    base_url: https://api.z.ai/api/paas/v4/
+
+# Per-role temperature (most gpt-5 family models require 1.0). Overridable per run.
+temperatures:
+  supervisor: 1.0
+  worker: 1.0
+  reasoning: 1.0
+  critic: 1.0
+  data_analyst: 1.0
+
+# -----------------------------------------------------------------------------
+# Sweep runs. Each run lists only the roles it changes; unlisted roles inherit
+# the "baseline" run's settings. A role entry is: {provider, model, [temperature]}.
+# -----------------------------------------------------------------------------
+runs:
+  # Current production config — the control. Mirrors the T2 V2 baseline.
+  - name: baseline_gpt5mini
+    roles:
+      supervisor:   {provider: openai, model: gpt-5-mini}
+      worker:       {provider: openai, model: gpt-5-mini}
+      reasoning:    {provider: openai, model: gpt-5-mini}
+      critic:       {provider: openai, model: gpt-5-mini}
+      data_analyst: {provider: openai, model: gpt-5-mini}
+
+  # Hypothesis: a stronger supervisor improves routing + adversarial hedging
+  # without re-pricing the whole pipeline. Workers held cheap.
+  - name: strong_supervisor
+    roles:
+      supervisor:   {provider: openai, model: gpt-5}
+
+  # Hypothesis: a stronger synthesizer/reasoner improves analysis quality + grounding.
+  - name: strong_reasoning
+    roles:
+      supervisor:   {provider: openai, model: gpt-5}
+      reasoning:    {provider: openai, model: gpt-5}
+
+  # Cross-provider: Anthropic supervisor + synthesizer, OpenAI workers/analyst.
+  # NOTE: anthropic roles cannot use OpenAI response_format; the planner relies on
+  # prompt-enforced JSON. Validate plan-parse success in T0 before trusting T1.
+  - name: anthropic_supervisor
+    roles:
+      # claude-sonnet-4-6 doesn't exist in the current Claude lineup (verified
+      # 2026-07-27 against platform.claude.com/.../pricing) -- updated to
+      # claude-sonnet-5, the current mid-tier flagship. On introductory
+      # pricing ($2/$10 per 1M) through 2026-08-31, reverts to $3/$15 after.
+      supervisor:   {provider: anthropic, model: claude-sonnet-5}
+      reasoning:    {provider: anthropic, model: claude-sonnet-5}
+
+  # OpenAI-compatible endpoint example (open-weights via Together) for cost/latency.
+  # "provider: together" references the named provider above, so its base_url and
+  # api_key_env are applied automatically.
+  - name: oss_workers_together
+    roles:
+      worker:       {provider: together, model: meta-llama/Llama-3.3-70B-Instruct-Turbo}
+      data_analyst: {provider: together, model: meta-llama/Llama-3.3-70B-Instruct-Turbo}
+
+  # Cross-provider comparisons requested for the multi-LLM eval. Model ids below
+  # are best-effort research as of 2026-07-27 (see
+  # EVALUATION.md for sourcing/confidence
+  # notes per provider) -- this space moves fast; confirm against each provider's
+  # current docs/dashboard before spending real API calls.
+  - name: deepseek_supervisor
+    roles:
+      # DeepSeek's own docs indicate deepseek-chat/deepseek-reasoner (the v3.x/r1
+      # generation) were superseded by v4-flash/v4-pro on 2026-07-24 -- 3 days
+      # before this was written. HIGH uncertainty: verify before running; if v4
+      # ids 404, fall back to deepseek-chat / deepseek-reasoner.
+      supervisor:   {provider: deepseek, model: deepseek-v4-flash}
+      reasoning:    {provider: deepseek, model: deepseek-v4-flash}
+
+  - name: kimi_supervisor
+    roles:
+      # kimi-k2.5 no longer appears on platform.kimi.ai/docs/pricing/chat as of
+      # 2026-07-27 -- updated to kimi-k2.6, the current mid-tier model
+      # (confirmed via the official chat-k26 pricing page). kimi-k3 is now the
+      # flagship (~3x k2.6's price) -- worth a T0 try if quality matters more
+      # than cost; see the recommendation table in §6 of the checklist doc.
+      supervisor:   {provider: moonshot, model: kimi-k2.6}
+      reasoning:    {provider: moonshot, model: kimi-k2.6}
+
+  - name: minimax_workers
+    roles:
+      # MiniMax-M3 is the current flagship (confirmed against
+      # platform.minimax.io/.../pricing-paygo, 2026-07-27) at the same
+      # per-token rate as M2.1 -- a strict upgrade, no cost tradeoff. Official
+      # casing is likely mixed-case ("MiniMax-M3"); llm_logger's cost lookup
+      # is case-insensitive so either casing attributes cost correctly, but
+      # the API itself may require exact casing. MEDIUM confidence on casing.
+      worker:       {provider: minimax, model: MiniMax-M3}
+      data_analyst: {provider: minimax, model: MiniMax-M3}
+
+  - name: gemini_supervisor
+    roles:
+      # gemini-2.5-flash is no longer listed on ai.google.dev/.../pricing as of
+      # 2026-07-27 (likely deprecated) -- updated to gemini-3.6-flash, the
+      # current flash-tier model (same input price as 3.5-flash, cheaper
+      # output). HIGH confidence on base_url and model id (both confirmed
+      # directly against the current pricing page).
+      supervisor:   {provider: gemini, model: gemini-3.6-flash}
+      reasoning:    {provider: gemini, model: gemini-3.6-flash}
+
+  - name: qwen_workers
+    roles:
+      # qwen-plus confirmed against Alibaba Cloud Model Studio docs. HIGH
+      # confidence on base_url, MEDIUM on model id (qwen3-max is a plausible
+      # stronger alternative -- see providers: comment above).
+      worker:       {provider: qwen, model: qwen-plus}
+      data_analyst: {provider: qwen, model: qwen-plus}
+
+  - name: glm_supervisor
+    roles:
+      # glm-5.2 is the model id used throughout docs.z.ai's own quick-start
+      # examples (cURL, official SDK, and OpenAI-SDK examples) as of
+      # 2026-07-27 -- HIGH confidence this is the current flagship. Pricing
+      # ($1.40/1M in, $4.40/1M out) is from a third-party aggregator, not
+      # docs.z.ai directly -- MEDIUM confidence, re-check before relying on
+      # cost estimates for this provider.
+      supervisor:   {provider: glm, model: glm-5.2}
+      reasoning:    {provider: glm, model: glm-5.2}
+
+  # Same-provider-judge example: all 5 roles AND the judge on DeepSeek,
+  # instead of the fixed OpenAI gpt-5.4-mini judge every other run above
+  # uses. `judge:` is resolved exactly like a role entry (provider name
+  # looked up in the providers: block above). Scores from this run are NOT
+  # directly comparable to any run using the default fixed judge -- see
+  # EVALUATION.md for the full cost/bias analysis.
+  # DeepSeek happens to be cheap enough that this specific swap *saves*
+  # money (deepseek-v4-pro as judge is still far below gpt-5.4-mini's rate);
+  # that isn't true for every provider -- check the analysis before copying
+  # this pattern to a pricier one.
+  #
+  # these two presets' names were inverted (the "selfjudge" one used a
+  # DIFFERENT model as judge, and the "flashjudge" one was the actual
+  # same-model self-judge) -- renamed below to match what each one actually
+  # does. `judge_is_same_model` in scripts/reusable/run_model_sweep.py's
+  # report header now makes this visible at run time too, not just in the name.
+
+  # Pipeline on deepseek-v4-flash, judge on the STRONGER deepseek-v4-pro --
+  # a cross-tier "pro judge", not a self-judge (judge != pipeline model).
+  - name: deepseek_pipeline_projudge
+    roles:
+      supervisor:   {provider: deepseek, model: deepseek-v4-flash}
+      worker:       {provider: deepseek, model: deepseek-v4-flash}
+      reasoning:    {provider: deepseek, model: deepseek-v4-flash}
+      critic:       {provider: deepseek, model: deepseek-v4-flash}
+      data_analyst: {provider: deepseek, model: deepseek-v4-flash}
+    judge: {provider: deepseek, model: deepseek-v4-pro, max_tokens: 8192}
+
+  # Pipeline AND judge both on deepseek-v4-flash -- a genuine self-judge
+  # (same model scoring its own output). Produces a
+  # self-preference-bias data point when compared against a cross-family
+  # judge (qwen3.7-flash, see deepseek_pipeline_qwenjudge below) scoring the
+  # same generation.
+  - name: deepseek_pipeline_selfjudge
+    roles:
+      supervisor:   {provider: deepseek, model: deepseek-v4-flash}
+      worker:       {provider: deepseek, model: deepseek-v4-flash}
+      reasoning:    {provider: deepseek, model: deepseek-v4-flash}
+      critic:       {provider: deepseek, model: deepseek-v4-flash}
+      data_analyst: {provider: deepseek, model: deepseek-v4-flash}
+    judge: {provider: deepseek, model: deepseek-v4-flash, max_tokens: 8192}
+
+  # qwen3.7-flash as judge -- the primary judge chosen for comparison
+  # (cheapest structured_outputs + seed-capable option, cross-family from
+  # DeepSeek). Pipeline stays on deepseek-v4-flash; only the judge changes,
+  # so this is directly comparable to deepseek_pipeline_selfjudge above for
+  # the bias table. temperature: 0 + seed: 42 match §1's judge-selection
+  # decision (structured_outputs is a call-time kwarg the judge factory
+  # applies, not a sweep-config field -- see judge_factory.make_ragas_judge_llm
+  # / make_deepeval_judge_model).
+  - name: deepseek_pipeline_qwenjudge
+    roles:
+      supervisor:   {provider: deepseek, model: deepseek-v4-flash}
+      worker:       {provider: deepseek, model: deepseek-v4-flash}
+      reasoning:    {provider: deepseek, model: deepseek-v4-flash}
+      critic:       {provider: deepseek, model: deepseek-v4-flash}
+      data_analyst: {provider: deepseek, model: deepseek-v4-flash}
+    judge: {provider: qwen, model: qwen3.7-flash, temperature: 0, max_tokens: 8192}

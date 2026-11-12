@@ -1,0 +1,53 @@
+cff-version: 1.2.0
+message: "Cite this software and, when used, the benchmark and the companion research paper. DOI and arXiv identifiers are pending publication."
+title: "Chemical Process Safety Agent: A Supervisor Multi-Agent Retrieval Framework"
+version: 0.1.0
+authors:
+  - family-names: Wang
+    given-names: Yichen
+license: MIT
+repository-code: "https://github.com/MaxYichenWang/chemical-process-safety-agent"
+keywords:
+  - process safety
+  - retrieval-augmented generation
+  - multi-agent systems
+  - LLM evaluation
+  - CSB
+  - OSHA
+references:
+  - type: article
+    title: "A Supervisor Multi-Agent Retrieval System for Chemical Process Safety: Reproducing and Extending a Decade of Incident Meta-Analysis with Auditable Evaluation"
+    authors:
+      - family-names: Wang
+        given-names: Yichen
+    notes: "Companion preprint; arXiv identifier pending publication."
+  - type: data
+    title: "Chemical Process Safety Bench"
+    authors:
+      - family-names: Wang
+        given-names: Yichen
+    url: "https://huggingface.co/datasets/maxyichenwang/chemical-process-safety-bench"
+    version: "1.0"
+    notes: "Paper benchmark revision v1.0; publication pending."
+  - type: data
+    title: "Paper artifacts: Chemical Process Safety Agent (v1)"
+    authors:
+      - family-names: Wang
+        given-names: Yichen
+    notes: "Frozen paper bundle; Zenodo DOI pending publication."
+  - type: article
+    title: "Factors contributing to US chemical plant process safety incidents from 2010 to 2020"
+    authors:
+      - family-names: Wang
+        given-names: Yichen
+      - family-names: Henriksen
+        given-names: Tara
+      - family-names: Deo
+        given-names: Milind
+      - family-names: Mentzer
+        given-names: Ray A.
+    journal: "Journal of Loss Prevention in the Process Industries"
+    volume: "71"
+    start: "104512"
+    year: 2021
+    doi: "10.1016/j.jlp.2021.104512"

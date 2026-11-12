@@ -1,0 +1,13 @@
+[
+  {
+    "query": "Can you verify an incident at the explicitly fictional Imaginary Reactor Facility?",
+    "expected_answer": "I cannot verify an incident at a fictional facility from the supplied sources.",
+    "ground_truth_chunks": [],
+    "source": "adversarial",
+    "category": "adversarial",
+    "expected_agents": [],
+    "expected_behavior": "refuse",
+    "l1_applicable": false,
+    "metadata": {"synthetic_fixture": true}
+  }
+]
